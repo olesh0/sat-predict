@@ -1,0 +1,6 @@
+[
+  { "section": "Space Stations", "url": "http://celestrak.com/norad/elements/stations.txt" },
+  { "section": "Weather", "url": "http://celestrak.com/norad/elements/weather.txt" },
+  { "section": "Starlink", "url": "http://celestrak.com/norad/elements/starlink.txt" },
+  { "section": "Amateur", "url": "http://celestrak.com/norad/elements/amateur.txt" }
+]

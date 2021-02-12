@@ -1,0 +1,12 @@
+{
+  "verbose": true,
+  "watch": ["src"],
+  "ext": "ts",
+  "ignore": [
+    "node_modules",
+    "./src/**/*.spec.ts",
+    "./src/integration-tests/**/*.ts",
+    "./src/__mocks__/**/*.ts"
+  ],
+  "exec": "ts-node ./src/index.ts"
+}
