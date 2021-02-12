@@ -5,7 +5,7 @@ import bearing from "quadrant-bearing"
 
 import { shortEnglishHumanizer } from "./utils"
 
-const CELESTRACK_SATS_URL = "http://celestrak.com/norad/elements/weather.txt"
+import celestrak from "../data/celestrack.json"
 
 interface OrbitInfo {
   satName: string;
@@ -13,9 +13,18 @@ interface OrbitInfo {
   secondRow: string;
 }
 
-export const getSatsList = async () => {
+export const getSatsList = async ({ section = null } = {}) => {
   try {
-    const { data } = await axios.get(CELESTRACK_SATS_URL)
+    const sectionName = section || celestrak[0]?.section
+
+    if (!sectionName) {
+      console.warn("No section was found in data/celestrack.json...")
+      return Promise.resolve([])
+    }
+
+    const { url } = celestrak.find(({ section: s }) => s === sectionName)
+
+    const { data } = await axios.get(url)
 
     const dataSplitted = data.split("\n")
     const dataList: OrbitInfo[]  = []
@@ -34,7 +43,10 @@ export const getSatsList = async () => {
       })
     })
 
-    return Promise.resolve(dataList)
+    return Promise.resolve({
+      section: sectionName,
+      sats: dataList,
+    })
   } catch (e) {
     console.log("Failed to fetch data from url...")
     console.error(e)
@@ -91,3 +103,5 @@ export const getSatInfo = ({ sattelite }) => {
 
   console.log(satInfo)
 }
+
+export const getSatsCategories = () => celestrak.map(({ section }) => section)

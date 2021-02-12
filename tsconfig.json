@@ -11,6 +11,7 @@
     "baseUrl": "./",
     "incremental": true,
     "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
     "esModuleInterop": true
   },
   "exclude": ["node_modules", "dist"],

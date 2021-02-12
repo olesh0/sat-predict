@@ -1,12 +1,14 @@
-import { getSatsList, predictPasses, getSatInfo } from "./core/sattelites"
+import { getSatsList, predictPasses, getSatInfo, getSatsCategories } from "./core/sattelites"
 
 getSatsList().then(async (sats) => {
-  const noaa19 = sats.find(({ satName }) => satName === "NOAA 19")
+  console.log(sats)
 
-  if (noaa19) {
-    console.log("NOAA 19 Location:")
+  // const noaa19 = sats.find(({ satName }) => satName === "NOAA 19")
 
-    // predictPasses({ sattelite: noaa19 }).then(console.log)
-    getSatInfo({ sattelite: noaa19 })
-  } else console.log("Couldn't find sattelite by name")
+  // if (noaa19) {
+  //   console.log("NOAA 19 Location:")
+
+  //   // predictPasses({ sattelite: noaa19 }).then(console.log)
+  //   // getSatInfo({ sattelite: noaa19 })
+  // } else console.log("Couldn't find sattelite by name")
 }).catch(console.error)
