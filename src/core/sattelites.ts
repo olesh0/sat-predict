@@ -101,7 +101,8 @@ export const getSatInfo = ({ sattelite }) => {
 
   const satInfo = jspredict.observe(tle, null)
 
-  console.log(satInfo)
+  // Gotta format this data somehow (like add human readable velocity and etc.)
+  return Promise.resolve(satInfo)
 }
 
 export const getSatsCategories = () => celestrak.map(({ section }) => section)
