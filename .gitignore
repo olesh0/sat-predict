@@ -87,3 +87,5 @@ typings/
 # DynamoDB Local files
 .dynamodb/
 *.cache
+*cache.json
+.DS_Store
