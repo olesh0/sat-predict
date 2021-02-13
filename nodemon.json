@@ -3,6 +3,7 @@
   "watch": ["src"],
   "ext": "ts",
   "ignore": [
+    "cache/**/*",
     "node_modules",
     "./src/**/*.spec.ts",
     "./src/integration-tests/**/*.ts",
