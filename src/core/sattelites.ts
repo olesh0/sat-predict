@@ -165,16 +165,7 @@ const calculatePasses = async ({ section, start, end }) => {
 
 export const predictPassesOfSection = async ({ section, start = null, end = null }: PredictPassesOfSectionProps) => {
   const sectionInfo = await getSatsList({ section })
-
-  const calculationStart = Date.now()
-
   const data = await calculatePasses({ section: sectionInfo, start, end })
-
-  const calculationStop = Date.now()
-  const timeTook = (calculationStop - calculationStart) / 1000
-
-  console.log("time calculation took:", timeTook + "s")
-  console.log(`definitely gotta cache these ${data.passes.length} sats with predictions`)
 
   return Promise.resolve(data)
 }
