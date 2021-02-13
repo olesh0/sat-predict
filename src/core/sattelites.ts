@@ -12,6 +12,7 @@ import celestrak from "../data/celestrack.json"
 
 const LOADED_FILES_PATH = "../data/cache"
 const TIME_FORMAT = "DD/MM/yyyy HH:mm:ss"
+const CACHE_LIFETIME = 3600 * 6 // 6 hours
 
 interface OrbitInfo {
   satName: string;
@@ -19,18 +20,39 @@ interface OrbitInfo {
   secondRow: string;
 }
 
-export const getSatsList = async ({ section = null } = {}) => {
+interface SatsListReturnValues {
+  section: string;
+  sats: any[];
+  cache: {
+    isOutdated: boolean;
+    hasProblems: boolean;
+    update: () => any;
+  };
+}
+
+export const getSatsList = async ({ section = null } = {}): Promise<SatsListReturnValues> => {
   try {
     const sectionName = section || celestrak[0]?.section
 
     if (!sectionName) {
       console.warn("No section was found in data/celestrack.json...")
-      return Promise.resolve([])
+      return Promise.resolve(null)
     }
 
-    const { url } = celestrak.find(({ section: s }) => s === sectionName)
+    const sectionInfo = celestrak.find(({ section: s }) => s === sectionName)
 
-    const { data } = await axios.get(url)
+    const cachePath = path.join(__dirname, `../data/cache/${base64.encode(sectionName)}.cache`)
+
+    if (!fs.existsSync(cachePath)) {
+      console.log("Creating cache for section:", sectionName)
+
+      await updateCache({ cachePath, url: sectionInfo.url })
+    }
+
+    const fileBuffer = fs.readFileSync(cachePath)
+    const fileContent = Buffer.from(fileBuffer).toString()
+    const { data: rawData, created } = JSON.parse(fileContent)
+    const data = base64.decode(rawData)
 
     const dataSplitted = data.split("\n")
     const dataList: OrbitInfo[]  = []
@@ -52,6 +74,11 @@ export const getSatsList = async ({ section = null } = {}) => {
     return Promise.resolve({
       section: sectionName,
       sats: dataList,
+      cache: {
+        update: () => cachePath && sectionInfo.url && updateCache({ cachePath, url: sectionInfo.url }),
+        isOutdated: moment(created).diff(Date.now() - CACHE_LIFETIME * 1000) < 0,
+        hasProblems: Boolean(!cachePath || !sectionInfo.url),
+      },
     })
   } catch (e) {
     console.log("Failed to fetch data from url...")
@@ -118,6 +145,8 @@ interface UpdateCacheProps {
 }
 
 const updateCache = async ({ cachePath, url }: UpdateCacheProps) => {
+  console.log(`Updating cache... ${cachePath}`)
+
   const { data } = await axios.get(url, { timeout: 10000 })
 
   try {
@@ -157,7 +186,7 @@ export const fetchFullData = async () => {
         const parsedCache = JSON.parse(cacheValues)
         const { created } = parsedCache
 
-        const cacheIsOutdated = moment(created).diff(Date.now() - (3600 * 6 * 1000)) < 0
+        const cacheIsOutdated = moment(created).diff(Date.now() - (CACHE_LIFETIME * 1000)) < 0
 
         if (cacheIsOutdated) {
           console.log(`Updated outdated cache ${cacheFilename}`)
