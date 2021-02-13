@@ -10,9 +10,14 @@ import { shortEnglishHumanizer } from "./utils"
 
 import celestrak from "../data/celestrack.json"
 
-const LOADED_FILES_PATH = "../data/cache"
+const LOADED_FILES_PATH = "../data/cache/sats/"
+const PREDICTIONS_FILES_PATH = "../data/cache/predictions/"
+
 const TIME_FORMAT = "DD/MM/yyyy HH:mm:ss"
 const CACHE_LIFETIME = 3600 * 6 // 6 hours
+
+const defaultPassesWindowStart = () => Date.now() - (3600000 / 2)
+const defaultPassesWindowEnd = () => Date.now() + (86400000 * 2)
 
 interface OrbitInfo {
   satName: string;
@@ -41,7 +46,7 @@ export const getSatsList = async ({ section = null } = {}): Promise<SatsListRetu
 
     const sectionInfo = celestrak.find(({ section: s }) => s === sectionName)
 
-    const cachePath = path.join(__dirname, `../data/cache/${base64.encode(sectionName)}.cache`)
+    const cachePath = path.join(__dirname, LOADED_FILES_PATH, `${base64.encode(sectionName)}.cache.json`)
 
     if (!fs.existsSync(cachePath)) {
       console.log("Creating cache for section:", sectionName)
@@ -92,22 +97,84 @@ interface PredictPassesOfSectionProps {
   end?: number | null;
 }
 
+const calculatePasses = async ({ section, start, end }) => {
+  const cacheFilename = `${base64.encode(section.section)}.prediction.cache.json`
+  const cacheFilePath = path.join(__dirname, PREDICTIONS_FILES_PATH, cacheFilename)
+  const cacheExists = fs.existsSync(cacheFilePath)
+
+  const recalculate = async () => {
+    const calcStart = Date.now()
+
+    const passesPromises = section.sats.map(async (sattelite) => {
+      const passes = await predictPasses({ sattelite, minimumElevation: 5, start, end })
+
+      return passes.map((pass) => ({
+        sattelite,
+        pass,
+      }))
+    })
+    const recalculatedData = await Promise.all(passesPromises)
+
+    const calcStop = Date.now()
+
+    const cacheTimingInfo = {
+      createdAt: calcStart,
+      evaluatedIn: (calcStop - calcStart) / 1000,
+      start: start || defaultPassesWindowStart(),
+      end: end || defaultPassesWindowEnd(),
+    }
+
+    // update/create cache
+    fs.writeFileSync(cacheFilePath, JSON.stringify({
+      data: recalculatedData,
+      ...cacheTimingInfo,
+    }, null, 2))
+
+    return Promise.resolve({
+      passes: recalculatedData,
+      cache: cacheTimingInfo,
+    })
+  }
+
+  let data
+
+  if (cacheExists) {
+    const cacheBuffer = fs.readFileSync(cacheFilePath)
+    const cacheContent = Buffer.from(cacheBuffer).toString()
+    const { data: passes, end, ...rest } = JSON.parse(cacheContent)
+
+    const shouldRecalculateCache = moment(end).diff(Date.now()) < 0
+
+    if (shouldRecalculateCache) {
+      data = await recalculate()
+    } else {
+      data = {
+        passes,
+        cache: {
+          end,
+          ...rest,
+        },
+      }
+    }
+  } else {
+    data = await recalculate()
+  }
+
+  return Promise.resolve(data)
+}
+
 export const predictPassesOfSection = async ({ section, start = null, end = null }: PredictPassesOfSectionProps) => {
   const sectionInfo = await getSatsList({ section })
 
   const calculationStart = Date.now()
 
-  const passesPromises = sectionInfo.sats.map((sattelite) => {
-    return predictPasses({ sattelite, minimumElevation: 20 })
-  })
-
-  const data = await Promise.all(passesPromises)
+  const data = await calculatePasses({ section: sectionInfo, start, end })
 
   const calculationStop = Date.now()
   const timeTook = (calculationStop - calculationStart) / 1000
 
   console.log("time calculation took:", timeTook + "s")
-  console.log(`definitely gotta cache these ${data.length} sats with predictions`)
+  console.log(`definitely gotta cache these ${data.passes.length} sats with predictions`)
 
   return Promise.resolve(data)
 }
@@ -120,16 +187,16 @@ export const predictPasses = ({
   location = null,
 }) => {
   const tle = `${sattelite.satName}\n${sattelite.firstRow}\n${sattelite.secondRow}`
-  const qth = location || [48.522034, 25.036870, 1] // Location. For now defaulted to Ukraine, Kolomyia
+  const qth = location || [48.522034, 25.036870, .1] // Location. For now defaulted to Ukraine, Kolomyia
 
-  const passStart = start || Date.now() - (3600000 / 2)
-  const passEnd = end ||  Date.now() + (86400000 * 2)
+  const passStart = start || defaultPassesWindowStart()
+  const passEnd = end || defaultPassesWindowEnd()
 
   try {
     const satInfo = jspredict.observe(tle)
 
     // Check for possible geostationary sattelite (we should ignore them)
-    if (satInfo.altitude > 10000) {
+    if (satInfo.altitude > 15000) {
       return Promise.resolve([])
     }
 
@@ -207,7 +274,7 @@ export const fetchFullData = async () => {
 
   const cachePromises = celestrak.map(async ({ section, url }) => {
     try {
-      const cacheFilename = `${base64.encode(section)}.cache`
+      const cacheFilename = `${base64.encode(section)}.cache.json`
       const cacheFilePath = path.join(__dirname, LOADED_FILES_PATH, cacheFilename)
       const cacheExists = fs.existsSync(cacheFilePath)
 
