@@ -86,6 +86,32 @@ export const getSatsList = async ({ section = null } = {}): Promise<SatsListRetu
   }
 }
 
+interface PredictPassesOfSectionProps {
+  section: string;
+  start?: number | null;
+  end?: number | null;
+}
+
+export const predictPassesOfSection = async ({ section, start = null, end = null }: PredictPassesOfSectionProps) => {
+  const sectionInfo = await getSatsList({ section })
+
+  const calculationStart = Date.now()
+
+  const passesPromises = sectionInfo.sats.map((sattelite) => {
+    return predictPasses({ sattelite, minimumElevation: 20 })
+  })
+
+  const data = await Promise.all(passesPromises)
+
+  const calculationStop = Date.now()
+  const timeTook = (calculationStop - calculationStart) / 1000
+
+  console.log("time calculation took:", timeTook + "s")
+  console.log(`definitely gotta cache these ${data.length} sats with predictions`)
+
+  return Promise.resolve(data)
+}
+
 export const predictPasses = ({
   sattelite,
   start = null,
@@ -94,38 +120,49 @@ export const predictPasses = ({
   location = null,
 }) => {
   const tle = `${sattelite.satName}\n${sattelite.firstRow}\n${sattelite.secondRow}`
-  const qth = location || [48.522034, 25.036870, .1] // Location. For now defaulted to Ukraine, Kolomyia
+  const qth = location || [48.522034, 25.036870, 1] // Location. For now defaulted to Ukraine, Kolomyia
 
-  const passStart = start || Date.now() - 3600000
-  const passEnd = end ||  Date.now() + 86400000
+  const passStart = start || Date.now() - (3600000 / 2)
+  const passEnd = end ||  Date.now() + (86400000 * 2)
 
-  const transits = jspredict.transits(tle, qth, passStart, passEnd, minimumElevation)
+  try {
+    const satInfo = jspredict.observe(tle)
 
-  const formatTime = (timestamp) => ({
-    timestamp,
-    formatted: moment(timestamp).format(TIME_FORMAT),
-  })
+    // Check for possible geostationary sattelite (we should ignore them)
+    if (satInfo.altitude > 10000) {
+      return Promise.resolve([])
+    }
 
-  const formatAzimuth = (degress) => ({
-    formatted: bearing(Math.round(degress)),
-    degress,
-  })
+    const transits = jspredict.transits(tle, qth, passStart, passEnd, minimumElevation)
 
-  const passes = transits.map(({ start, end, duration, apexAzimuth, maxAzimuth, minAzimuth, ...rest }) => ({
-    start: formatTime(start),
-    end: formatTime(end),
-    maxElevationTime: formatTime(start + (duration / 2)),
-    apexAzimuth: formatAzimuth(apexAzimuth),
-    maxAzimuth: formatAzimuth(maxAzimuth),
-    minAzimuth: formatAzimuth(minAzimuth),
-    duration: {
-      seconds: duration,
-      formatted: shortEnglishHumanizer(duration),
-    },
-    ...rest,
-  }))
+    const formatTime = (timestamp) => ({
+      timestamp,
+      formatted: moment(timestamp).format(TIME_FORMAT),
+    })
 
-  return Promise.resolve(passes)
+    const formatAzimuth = (degress) => ({
+      formatted: bearing(Math.round(degress)),
+      degress,
+    })
+
+    const passes = transits.map(({ start, end, duration, apexAzimuth, maxAzimuth, minAzimuth, ...rest }) => ({
+      start: formatTime(start),
+      end: formatTime(end),
+      maxElevationTime: formatTime(start + (duration / 2)),
+      apexAzimuth: formatAzimuth(apexAzimuth),
+      maxAzimuth: formatAzimuth(maxAzimuth),
+      minAzimuth: formatAzimuth(minAzimuth),
+      duration: {
+        seconds: duration,
+        formatted: shortEnglishHumanizer(duration),
+      },
+      ...rest,
+    }))
+
+    return Promise.resolve(passes)
+  } catch (e) {
+    return Promise.resolve([])
+  }
 }
 
 export const getSatInfo = ({ sattelite }) => {

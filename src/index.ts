@@ -1,19 +1,31 @@
-import { getSatsList, predictPasses, getSatInfo, getSatsCategories, fetchFullData } from "./core/sattelites"
+import {
+  getSatsList,
+  predictPasses,
+  getSatInfo,
+  getSatsCategories,
+  fetchFullData,
+  predictPassesOfSection,
+} from "./core/sattelites"
+
 import celestrack from "./data/celestrack.json"
 
-getSatsList({ section: celestrack.find(() => Math.random() > 0.5)?.section }).then(async ({ sats, section, cache }) => {
-  // fetchFullData().then(console.log)
+const { section } = celestrack[0] // celestrack.find(() => Math.random() > 0.5)
 
-  cache.isOutdated && !cache.hasProblems && cache.update()
+predictPassesOfSection({ section })
 
-  const sat = sats[0]
+// getSatsList({ section: randomSection?.section }).then(async ({ sats, section, cache }) => {
+//   // fetchFullData().then(console.log)
 
-  console.log(`We have list of ${sats.length} sats. Section: "${section}"`)
+//   cache.isOutdated && !cache.hasProblems && cache.update()
 
-  if (sat) {
-    console.log(sat.satName)
+//   const sat = sats[0]
 
-    getSatInfo({ sattelite: sat }).then(console.log)
-    // predictPasses({ sattelite: sat }).then(console.log)
-  } else console.log("Couldn't find sattelite by name")
-}).catch(console.error)
+//   console.log(`We have list of ${sats.length} sats. Section: "${section}"`)
+
+//   // if (sat) {
+//   //   console.log(sat.satName)
+
+//   //   getSatInfo({ sattelite: sat }).then(console.log)
+//   //   // predictPasses({ sattelite: sat }).then(console.log)
+//   // } else console.log("Couldn't find sattelite by name")
+// }).catch(console.error)
